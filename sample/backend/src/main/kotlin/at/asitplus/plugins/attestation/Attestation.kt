@@ -55,7 +55,12 @@ fun Application.configureAttestation() {
                 environment.config.property("attestation.android.min-version").getString().toInt()
             }.getOrNull().also {
                 log.info("Android minimum OS version: ${it ?: "none"}")
-            }
+            },
+//            hardwareAttestationTrustAnchors = linkedSetOf(*DEFAULT_HARDWARE_TRUST_ANCHORS), //OPTIONAL, defaults shown here
+//            softwareAttestationTrustAnchors = linkedSetOf(*DEFAULT_SOFTWARE_TRUST_ANCHORS), //OPTIONAL, defaults shown here
+            disableHardwareAttestation = true,     //OPTIONAL, defaults to false. Set to true to disable HW attestation
+            enableNougatAttestation = false,        //OPTIONAL, defaults to false. Set to true to enable hybrid attestation
+            enableSoftwareAttestation = true       //OPTIONAL, defaults to false. Set to true to enable SW attestation
         ),
         iosAttestationConfiguration = IOSAttestationConfiguration(
             IOSAttestationConfiguration.AppData(
