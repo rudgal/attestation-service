@@ -75,7 +75,7 @@ fun Attestation() {
     val scope = rememberCoroutineScope()
     val dataStore = context.dataStore
 
-    var host by remember { mutableStateOf("http://192.168.178.33") }
+    var host by remember { mutableStateOf("http://10.0.2.2") }
 
     scope.launch {
         dataStore.data.map { certs ->
@@ -146,26 +146,62 @@ fun Attestation() {
             Spacer(Modifier.size(16.dp))
 
             Button(
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    contentColor = MaterialTheme.colorScheme.onSecondary
-                ),
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    client.purge(host)
                     scope.launch {
-                        val chain = stringPreferencesKey(host)
-                        dataStore.edit { certs ->
-                            certs.remove(chain)
-                        }
+                        System.err.println("trying $host")
+                        client.startBinding(host).fold(onFailure = {
+                            log = "Could not fetch challenge:\n${it.message}"
+                        },
+                            onSuccess = {
+                                log = "Received Challenge: ${json.encodeToString(it)}"
+                                val resp = client.createFakeBinding(host, it.challenge).fold(onFailure = {
+                                    log += "Could not create binding:\n${it.message}"
+                                },
+                                    onSuccess = { resp ->
+                                        if (resp is AttestationResponse.Success) {
+                                            log += "\n\nGot Binding (${resp.certificateChain.first().subjectDN.name})."
+                                            KeyStore.getInstance("AndroidKeyStore").apply { load(null, null) }.let {
+                                                val chain = stringPreferencesKey(host)
+                                                dataStore.edit { certs ->
+                                                    certs[chain] = Json.encodeToString(resp)
+                                                }
+                                            }
+                                        }
+                                        log += "\n\nReceived Binding Response: ${json.encodeToString(resp)}"
+                                    })
+                            })
                     }
-                    log = "Removed credentials for $host"
 
                 }) {
-                Text(text = "Delete credentials for host")
+                Text(text = "Fake Binding")
             }
 
+
         }
+
+        Button(
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                client.purge(host)
+                scope.launch {
+                    val chain = stringPreferencesKey(host)
+                    dataStore.edit { certs ->
+                        certs.remove(chain)
+                    }
+                }
+                log = "Removed credentials for $host"
+
+            }) {
+            Text(text = "Delete credentials for host")
+        }
+
+        Spacer(Modifier.size(16.dp))
+
         Button(
             modifier = Modifier.fillMaxWidth(),
             onClick = {
